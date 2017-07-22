@@ -80,4 +80,4 @@ while True:
 		file.close()
 	else:
 		#holdoff for a while - no need to check all the time
-		time.sleep(5)
+		time.sleep(30)
