@@ -1,10 +1,11 @@
-#hack to check last svn checkin, and post it to slack channel #altium-svn-updates
+#hack to check last svn checkin, and post it to slack and MS teams channel #altium-svn-updates 
 #Johannes Book 2017
 
 pathToLocalSvn = '"C:/robbot/svn checkout"'  #Note - don't use backslash
 pathToDataFile = 'C:/robbot/robbot.data'
 
-webhookUrl = 'https://hooks.slack.com/services/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'
+slackWebhookUrl = 'ADD SLACK WEBHOOK URL HERE'
+teamsWebhookUrl = 'ADD TEAMS WEBHOOK URL HERE'
 
 import sys
 import re
@@ -44,21 +45,69 @@ while True:
 			#parse all file paths
 			xmldoc = minidom.parseString(output)
 			itemlist = xmldoc.getElementsByTagName('path')
+			del files[:] #remove old stuff
 			for s in itemlist:
 				#print(s.firstChild.nodeValue)
 				files.append(s.firstChild.nodeValue)
 
 			for i, item in enumerate(files):
-				match2 = re.search(r'/.*/([A-Z]{3,20}?).*/(.*)$',item,re.M|re.DOTALL)	#get file name
-				if match2:
-					project = match2.group(1)
-					files[i] = match2.group(2)
-				else:
-					files[i] = ""
+				parts = item.split('/')
+				project = parts[2].split('-')[0] #project name is what comes before the '-' in the folder name
+				files[i] = parts[len(parts)-1]
 		else:
 			print('Error #476 - please replace your CD-ROM')
 
-		#sys.exit("halt!")
+		# post to teams:
+		if (what): 
+			
+			filesString = ""
+			if (len(files) > 1):
+				for s in files:
+					filesString = filesString + " | " + s
+				filesString = filesString + " |"
+			else:
+				filesString = files[0]
+
+			if not (project):
+				project = "unknown"
+				
+			teamsData = {
+				"@type": "MessageCard",
+				"@context": "http://schema.org/extensions",
+				"summary": project,
+				"themeColor": "FF5800",
+				"title": project,
+				"sections": [
+					{
+						"facts": [
+							{
+								"name": "By:",
+								"value": who + " (" + rev + ")"
+							},
+							{
+								"name": "Files:",
+								"value": filesString
+							}
+						],
+						"text": what
+					}	
+				]
+			}
+				
+
+			response = requests.post(
+				teamsWebhookUrl, data=json.dumps(teamsData),
+				headers={'Content-Type': 'application/json'}
+				)
+			if response.status_code != 200:
+				raise ValueError(
+					'Request to Teams returned an error %s, the response is:\n%s'
+					% (response.status_code, response.text)
+				)
+		
+
+		#sys.exit("Quit")
+		#what = ""
 		
 		# post to slack:
 		if (what): #only if they wrote a commit message
@@ -80,7 +129,7 @@ while True:
 
 
 			response = requests.post(
-				webhookUrl, data=json.dumps(slackData),
+				slackWebhookUrl, data=json.dumps(slackData),
 				headers={'Content-Type': 'application/json'}
 				)
 			if response.status_code != 200:
